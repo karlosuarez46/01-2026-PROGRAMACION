@@ -1,194 +1,209 @@
 
+
 """
 # problemas que presenta la version 2
--No ordena por valor atención (mes,dia,hora)
--No valida cédulas duplicadas
--No valida cédulas duplicadas
--No normaliza los nombres
--No valida longitud mínima de teléfono (10 digitos)
--No hay opción de ver solo clientes urgentes,o cita normal
--eliminar clientes registrado
+ 
+-No calcula Totalidad de Clientes 
+-No calcula Ingresos totales
+-No calcula clientes por procedimientos 
+-No busca por cédula 
+
 
 """
+## Programa para consultorio odontológico version 2
 
-
-
-# Versión 2 
-# Programa para consultorio odontológico
-
-import datetime
-
-
-# CONFIGURACIÓN DE PRECIOS
-
+from datetime import datetime, timedelta
+import re
 
 # Tablas de precios
-precios_cita = { "Particular": 80000,"EPS": 5000,"Prepagada": 30000 }
+precios_cita = { "Particular": 80000, "EPS": 5000, "Prepagada": 30000 }
 
-precios_atencion = {
-    "Particular": {"Limpieza": 60000, "Calzas": 80000, "Extracción": 100000, "Diagnóstico": 50000},
-    "EPS": {"Limpieza": 0, "Calzas": 40000, "Extracción": 40000, "Diagnóstico": 0},
-    "Prepagada": {"Limpieza": 0, "Calzas": 10000, "Extracción": 10000, "Diagnóstico": 0}
-}
+precios_atencion = { 
+"Particular": {"Limpieza": 60000, "Calzas": 80000, "Extracción": 100000, "Diagnóstico": 50000},
+"EPS": {"Limpieza": 0, "Calzas": 40000, "Extracción": 40000, "Diagnóstico": 0},
+"Prepagada": {"Limpieza": 0, "Calzas": 10000, "Extracción": 10000, "Diagnóstico": 0}}
 
-# Lista para almacenar clientes
-clientes = []
+# Horarios disponibles (cada hora en punto)
+horarios_disponibles = ["08:00", "09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"]
 
-# FUNCIONES DE VALIDACIÓN
+# Base de datos de citas (simulada en memoria)
+citas_agendadas = {}  # Formato: {"DD/MM/AAAA HH:MM": cedula}
 
-def validar_opcion(mensaje, min_op, max_op):
-    """Valida que la opción ingresada esté dentro del rango permitido"""
-    while True:
-        try:
-            op = int(input(mensaje))
-            if min_op <= op <= max_op:
-                return op
-            print(f"Opción inválida. Debe ser entre {min_op} y {max_op}")
-        except ValueError:
-            print("Error: Debe ingresar un número")
+def validar_cedula(cedula):
+    """Valida que la cédula contenga solo números"""
+    return cedula.isdigit()
 
-def validar_cantidad(mensaje):
-    """Valida que la cantidad sea un número positivo"""
-    while True:
-        try:
-            cantidad = int(input(mensaje))
-            if cantidad > 0:
-                return cantidad
-            print("La cantidad debe ser mayor a 0")
-        except ValueError:
-            print("Error: Debe ingresar un número")
-
-def validar_nombre(mensaje):
+def validar_nombre(nombre):
     """Valida que el nombre no contenga números"""
-    while True:
-        nombre = input(mensaje).strip()
-        if not nombre:
-            print("El nombre no puede estar vacío")
-            continue
-        
-        # Verificar que no tenga números
-        if any(caracter.isdigit() for caracter in nombre):
-            print("Error: El nombre no debe contener números")
-            continue
-        
-        return nombre
+    return not any(char.isdigit() for char in nombre) and nombre.strip() != ""
 
-def validar_fecha(mensaje):
-    """
-    Valida que la fecha sea posterior o igual a la fecha actual
-    Formato esperado: DD/MM/AAAA
-    """
-    while True:
-        fecha_str = input(mensaje)
-        try:
-            dia, mes, anio = map(int, fecha_str.split('/'))
-            fecha_ingresada = datetime.date(anio, mes, dia)
-            fecha_actual = datetime.date.today()
-            
-            if fecha_ingresada < fecha_actual:
-                print("Error: La fecha no puede ser menor al día actual")
-                continue
-            
-            return fecha_str
-        except ValueError:
-            print("Error: Formato inválido. Use DD/MM/AAAA")
+def validar_telefono(telefono):
+    """Valida teléfono: solo números, mínimo 7, máximo 10 dígitos"""
+    return telefono.isdigit() and 7 <= len(telefono) <= 10
 
-def validar_telefono(mensaje):
-    """Valida que el teléfono solo contenga números"""
-    while True:
-        telefono = input(mensaje).strip()
-        if not telefono:
-            print("El teléfono no puede estar vacío")
-            continue
-        
-        if not telefono.isdigit():
-            print("Error: El teléfono solo debe contener números")
-            continue
-        
-        return telefono
+def validar_fecha(fecha_str):
+    """Valida que la fecha no sea anterior al día actual"""
+    try:
+        fecha = datetime.strptime(fecha_str, "%d/%m/%Y")
+        fecha_actual = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        return fecha >= fecha_actual
+    except ValueError:
+        return False
 
-def validar_cedula(mensaje):
-    """Valida que la cédula solo contenga números"""
-    while True:
-        cedula = input(mensaje).strip()
-        if not cedula:
-            print("La cédula no puede estar vacía")
-            continue
-        
-        if not cedula.isdigit():
-            print("Error: La cédula solo debe contener números")
-            continue
-        
-        return cedula
+def obtener_horarios_disponibles(fecha):
+    """Retorna lista de horarios disponibles para una fecha específica"""
+    disponibles = []
+    for hora in horarios_disponibles:
+        clave = f"{fecha} {hora}"
+        if clave not in citas_agendadas:
+            disponibles.append(hora)
+    return disponibles
 
+def agendar_cita(fecha, hora, cedula):
+    """Agenda una cita en la fecha y hora especificada"""
+    clave = f"{fecha} {hora}"
+    citas_agendadas[clave] = cedula
 
-# FUNCIÓN DE CAPTURA DE CLIENTE
+def validar_opcion_menu(opcion, min_op, max_op):
+    """Valida que la opción esté dentro del rango permitido"""
+    try:
+        opcion_int = int(opcion)
+        return min_op <= opcion_int <= max_op, opcion_int
+    except ValueError:
+        return False, None
 
-
-def capturar_cliente():
-    """
-    Captura los datos de un cliente y calcula el valor a pagar
-    """
+def registrar_cita():
+    """Función principal para registrar una nueva cita"""
     print("\n" + "="*50)
-    print("REGISTRO DE NUEVO CLIENTE")
+    print("REGISTRO DE NUEVA CITA")
     print("="*50)
     
-    # Datos básicos con validaciones
-    cedula = validar_cedula("Cédula: ")
-    nombre = validar_nombre("Nombre completo: ")
-    telefono = validar_telefono("Teléfono: ")
+    # Validar cédula
+    while True:
+        cedula = input("Cédula: ")
+        if validar_cedula(cedula):
+            break
+        print("❌ Error: La cédula solo debe contener números. Intente nuevamente.")
     
-    # Tipo de cliente
-    print("\n--- Tipo de Cliente ---")
-    print("1. Particular")
-    print("2. EPS")
-    print("3. Prepagada")
-    tipo_op = validar_opcion("Seleccione: ", 1, 3)
-    tipos = ["", "Particular", "EPS", "Prepagada"]
-    tipo = tipos[tipo_op]
+    # Validar nombre
+    while True:
+        nombre = input("Nombre: ")
+        if validar_nombre(nombre):
+            break
+        print("❌ Error: El nombre no debe contener números. Intente nuevamente.")
     
-    # Tipo de atención
-    print("\n--- Tipo de Atención ---")
-    print("1. Limpieza")
-    print("2. Calzas")
-    print("3. Extracción")
-    print("4. Diagnóstico")
-    atencion_op = validar_opcion("Seleccione: ", 1, 4)
-    atenciones = ["", "Limpieza", "Calzas", "Extracción", "Diagnóstico"]
-    atencion = atenciones[atencion_op]
+    # Validar teléfono
+    while True:
+        telefono = input("Teléfono: ")
+        if validar_telefono(telefono):
+            break
+        print("❌ Error: El teléfono debe tener entre 7 y 10 dígitos numéricos. Intente nuevamente.")
     
-    # Cantidad (según tipo de atención)
+    # Validar tipo de cliente
+    while True:
+        print("\nTipo Cliente:")
+        print("1. Particular")
+        print("2. EPS")
+        print("3. Prepagada")
+        opcion = input("Opción: ")
+        valida, tipo_opcion = validar_opcion_menu(opcion, 1, 3)
+        if valida:
+            if tipo_opcion == 1:
+                tipo = "Particular"
+            elif tipo_opcion == 2:
+                tipo = "EPS"
+            else:
+                tipo = "Prepagada"
+            break
+        print("❌ Error: Opción inválida. Seleccione 1, 2 o 3.")
+    
+    # Validar tipo de atención
+    while True:
+        print("\nTipo de Atención:")
+        print("1. Limpieza")
+        print("2. Calzas")
+        print("3. Extracción")
+        print("4. Diagnóstico")
+        opcion = input("Opción: ")
+        valida, atencion_opcion = validar_opcion_menu(opcion, 1, 4)
+        if valida:
+            if atencion_opcion == 1:
+                atencion = "Limpieza"
+            elif atencion_opcion == 2:
+                atencion = "Calzas"
+            elif atencion_opcion == 3:
+                atencion = "Extracción"
+            else:
+                atencion = "Diagnóstico"
+            break
+        print("❌ Error: Opción inválida. Seleccione 1, 2, 3 o 4.")
+    
+    # Cantidad (solo para ciertos tratamientos)
     if atencion in ["Limpieza", "Diagnóstico"]:
         cantidad = 1
         print(f"Cantidad: {cantidad} (valor fijo para {atencion})")
     else:
-        cantidad = validar_cantidad("Cantidad: ")
+        while True:
+            try:
+                cantidad = int(input("Cantidad: "))
+                if cantidad > 0:
+                    break
+                print("❌ Error: La cantidad debe ser mayor a 0.")
+            except ValueError:
+                print("❌ Error: Ingrese un número válido.")
     
-    # Prioridad
-    print("\n--- Prioridad ---")
-    print("1. Normal")
-    print("2. Urgente")
-    prioridad_op = validar_opcion("Seleccione: ", 1, 2)
-    prioridades = ["", "Normal", "Urgente"]
-    prioridad = prioridades[prioridad_op]
+    # Validar prioridad
+    while True:
+        print("\nPrioridad:")
+        print("1. Normal")
+        print("2. Urgente")
+        opcion = input("Opción: ")
+        valida, prioridad_opcion = validar_opcion_menu(opcion, 1, 2)
+        if valida:
+            prioridad = "Normal" if prioridad_opcion == 1 else "Urgente"
+            break
+        print("❌ Error: Opción inválida. Seleccione 1 o 2.")
     
-    # Fecha con validación (no menor al día actual)
-    fecha = validar_fecha("Fecha de la cita (DD/MM/AAAA): ")
+    # Validar fecha
+    while True:
+        fecha = input("Fecha de la Cita (DD/MM/AAAA): ")
+        if validar_fecha(fecha):
+            break
+        print("❌ Error: Fecha inválida o anterior al día actual. Intente nuevamente.")
     
-    # Cálculo del valor
+    # Validar horario disponible
+    while True:
+        horarios_disp = obtener_horarios_disponibles(fecha)
+        if not horarios_disp:
+            print(f"❌ No hay horarios disponibles para la fecha {fecha}.")
+            print("Por favor, seleccione otra fecha.")
+            while True:
+                fecha = input("Nueva fecha (DD/MM/AAAA): ")
+                if validar_fecha(fecha):
+                    break
+                print("❌ Error: Fecha inválida o anterior al día actual.")
+            continue
+        
+        print(f"\nHorarios disponibles para {fecha}:")
+        for i, hora in enumerate(horarios_disp, 1):
+            print(f"{i}. {hora}")
+        
+        try:
+            opcion_horario = int(input("Seleccione el horario (número): "))
+            if 1 <= opcion_horario <= len(horarios_disp):
+                hora_seleccionada = horarios_disp[opcion_horario - 1]
+                break
+            print(f"❌ Error: Seleccione un número entre 1 y {len(horarios_disp)}.")
+        except ValueError:
+            print("❌ Error: Ingrese un número válido.")
+    
+    # Calcular valor
     valor_cita = precios_cita[tipo]
     valor_atencion = precios_atencion[tipo][atencion]
     total_pagar = valor_cita + (valor_atencion * cantidad)
     
-    # Mostrar resumen
-    print("\n" + "-"*30)
-    print(f"Valor de la cita: ${valor_cita:,.0f}")
-    print(f"Valor de atención: ${valor_atencion:,.0f} x {cantidad}")
-    print(f"TOTAL A PAGAR: ${total_pagar:,.0f}")
-    print("-"*30)
-    
-    # Retornar diccionario con todos los datos
-    return {
+    # Guardar cita
+    cliente = {
         "cedula": cedula,
         "nombre": nombre,
         "telefono": telefono,
@@ -197,115 +212,70 @@ def capturar_cliente():
         "cantidad": cantidad,
         "prioridad": prioridad,
         "fecha": fecha,
-        "valor_cita": valor_cita,
-        "valor_atencion": valor_atencion,
+        "hora": hora_seleccionada,
         "total": total_pagar
     }
-
-
-# FUNCIONES DE ESTADÍSTICAS Y LISTADO
-
-
-def mostrar_estadisticas():
-    """Muestra las estadísticas requeridas"""
-    if len(clientes) == 0:
-        print("\n⚠️ No hay clientes registrados")
-        return
     
-    total_clientes = len(clientes)
-    ingresos_totales = sum(c["total"] for c in clientes)
-    extracciones = sum(1 for c in clientes if c["atencion"] == "Extracción")
+    # Agendar en el sistema
+    agendar_cita(fecha, hora_seleccionada, cedula)
+    
+    # Mostrar resultado
+    print("\n" + "="*50)
+    print("✅ CITA REGISTRADA EXITOSAMENTE")
+    print("="*50)
+    print(f"Cliente: {nombre}")
+    print(f"Cédula: {cedula}")
+    print(f"Teléfono: {telefono}")
+    print(f"Tipo: {tipo}")
+    print(f"Atención: {atencion}")
+    print(f"Cantidad: {cantidad}")
+    print(f"Prioridad: {prioridad}")
+    print(f"Fecha: {fecha}")
+    print(f"Hora: {hora_seleccionada}")
+    print(f"Valor a pagar: ${total_pagar:,.0f}")
+    print("="*50)
+    
+    return cliente
+
+def consultar_citas():
+    """Muestra todas las citas agendadas"""
+    if not citas_agendadas:
+        print("\n📅 No hay citas agendadas actualmente.")
+        return
     
     print("\n" + "="*50)
-    print("ESTADÍSTICAS DEL CONSULTORIO")
+    print("CITAS AGENDADAS")
     print("="*50)
-    print(f"📊 Total Clientes: {total_clientes}")
-    print(f"💰 Ingresos totales: ${ingresos_totales:,.0f}")
-    print(f"🦷 Clientes para extracción: {extracciones}")
+    for fecha_hora, cedula in sorted(citas_agendadas.items()):
+        print(f"📌 {fecha_hora} - Cédula: {cedula}")
     print("="*50)
 
-def mostrar_lista_clientes():
-    """Muestra todos los clientes registrados en formato tabla"""
-    if len(clientes) == 0:
-        print("\n⚠️ No hay clientes registrados")
-        return
-    
-    print("\n" + "="*90)
-    print("LISTA DE CLIENTES REGISTRADOS")
-    print("="*90)
-    print(f"{'Cédula':<12} {'Nombre':<25} {'Atención':<12} {'Fecha':<12} {'Total':>12}")
-    print("-"*90)
-    
-    for c in clientes:
-        print(f"{c['cedula']:<12} {c['nombre']:<25} {c['atencion']:<12} {c['fecha']:<12} ${c['total']:>10,.0f}")
-    
-    print("="*90)
-
-# ==========================================
-# PROGRAMA PRINCIPAL
-# ==========================================
-
-print("\n" + "="*50)
-print("BIENVENIDO AL CONSULTORIO ODONTOLÓGICO")
-print("="*50)
-
-# Solicitar número de clientes a registrar
-while True:
-    try:
-        n = int(input("\n¿Cuántos clientes desea registrar? "))
-        if n > 0:
-            break
-        print("Debe registrar al menos 1 cliente")
-    except ValueError:
-        print("Error: Debe ingresar un número válido")
-
-# Registrar clientes
-for i in range(n):
-    print(f"\n--- Cliente {i+1} de {n} ---")
-    clientes.append(capturar_cliente())
-    print(f"\n✓ Cliente {i+1} registrado exitosamente")
-
-# Mostrar estadísticas
-mostrar_estadisticas()
-
-# Mostrar lista completa
-mostrar_lista_clientes()
-
-# ==========================================
-# MENÚ PARA AGREGAR MÁS CLIENTES
-# ==========================================
-
-print("\n" + "="*50)
-print("MENÚ ADICIONAL")
-print("="*50)
-print("1. Agregar más clientes")
-print("2. Salir")
-
-op = validar_opcion("Seleccione: ", 1, 2)
-
-if op == 1:
+def menu_principal():
+    """Menú interactivo principal"""
     while True:
-        try:
-            n2 = int(input("\n¿Cuántos clientes más desea registrar? "))
-            if n2 > 0:
-                for i in range(n2):
-                    clientes.append(capturar_cliente())
-                break
-            print("Debe registrar al menos 1 cliente")
-        except ValueError:
-            print("Error: Debe ingresar un número válido")
+        print("\n" + "="*50)
+        print("CONSULTORIO ODONTOLÓGICO")
+        print("="*50)
+        print("1. Registrar nueva cita")
+        print("2. Ver citas agendadas")
+        print("3. Salir")
+        print("="*50)
+        
+        opcion = input("Seleccione una opción: ")
+        valida, opcion_num = validar_opcion_menu(opcion, 1, 3)
+        
+        if not valida:
+            print("❌ Error: Opción inválida. Seleccione 1, 2 o 3.")
+            continue
+        
+        if opcion_num == 1:
+            registrar_cita()
+        elif opcion_num == 2:
+            consultar_citas()
+        elif opcion_num == 3:
+            print("\n👋 ¡Gracias por usar el sistema! Hasta luego.")
+            break
 
-# Mostrar estadísticas actualizadas
-mostrar_estadisticas()
-mostrar_lista_clientes()
-
-# ==========================================
-# FIN DEL PROGRAMA
-# ==========================================
-
-print("\n" + "="*50)
-print("PROGRAMA FINALIZADO")
-print(f"Total clientes registrados: {len(clientes)}")
-print(f"Ingresos totales: ${sum(c['total'] for c in clientes):,.0f}")
-print("="*50)
-
+# Ejecutar el programa
+if __name__ == "__main__":
+    menu_principal()

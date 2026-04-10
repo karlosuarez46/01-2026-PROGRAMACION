@@ -2,20 +2,21 @@
 """
 # problemas que presenta la version 1
 
--No permite registra múltiples clientes
--No tiene validación de datos - Entrada sin control 
--Validación de cantidad > 0
--Menú para agregar más clientes	
--No calcula Totalidad de Clientes 
--No calcula Ingresos totales
--No calcula clientes por procedimientos 
--No ordena clientes 
--No busca por cédula 
+-menú interactivo
+-No tiene validación de datos: entrada sin control. 
+-ajustar un horario de cita (no se puede repetir hora a otro cliente); deben salir las opciones de los horarios disponibles.
+Cédula (no pueden ser letras); solo debe contener números. 
+-nombres (no puede ser número) 
+Números telefónicos (no pueden ser letras); solo deben contener números, máximo 10 dígitos, mínimo 7 dígitos.
+-tipo de cliente (solo debe ser las 3 opciones); debe arrojar error en caso de escribir otra opción diferente. 
+- Tipo de atención: (solo debe ser las 4 opciones); debe arrojar error en caso de escribir otra opción diferente. 
+-Prioridad: (solo debe ser las 2 opciones); debe arrojar error en caso de escribir otra opción diferente. 
+-Fecha de la cita: (no puede ser días, meses, años anteriores al presente)
+
 """
 
-# Versión 1 
+## Programa para consultorio odontológico version 1
 
-## Programa para consultorio odontológico
 # Tablas de precios
 
 precios_cita = { "Particular": 80000,"EPS": 5000,"Prepagada": 30000 }
@@ -23,8 +24,7 @@ precios_cita = { "Particular": 80000,"EPS": 5000,"Prepagada": 30000 }
 precios_atencion = {
 "Particular": {"Limpieza": 60000, "Calzas": 80000, "Extracción": 100000, "Diagnóstico": 50000},
 "EPS": {"Limpieza": 0, "Calzas": 40000, "Extracción": 40000, "Diagnóstico": 0},
-"Prepagada": {"Limpieza": 0, "Calzas": 10000, "Extracción": 10000, "Diagnóstico": 0}
-}
+"Prepagada": {"Limpieza": 0, "Calzas": 10000, "Extracción": 10000, "Diagnóstico": 0}}
 
 # Capturar datos de un cliente
 print("=== CONSULTORIO ODONTOLÓGICO ===")
